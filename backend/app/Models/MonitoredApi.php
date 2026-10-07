@@ -48,4 +48,28 @@ class MonitoredApi extends Model
     {
         return $this->hasMany(Incident::class);
     }
+
+    /**
+     * Scope a query to only include APIs that are due for checking.
+     *
+     * An API is due when:
+     * - last_checked_at is null (never checked), OR
+     * - current time >= last_checked_at + interval minutes
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeDue($query)
+    {
+        return $query->where(function (/** \Illuminate\Database\Eloquent\Builder */ $q) {
+            $q->whereNull('last_checked_at');
+
+            $q->orWhereRaw(
+                'now() >= DATE_ADD('
+                . $q->getModel()->getTable()
+                . '.last_checked_at, INTERVAL '
+                . $q->getModel()->getTable() . '.`interval` MINUTE)'
+            );
+        });
+    }
 }

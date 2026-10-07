@@ -37,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
             //
         });
 
-        Schedule::command('api-monitor:check')
+        Schedule::command('api-monitor:dispatch')
             ->everyMinute();
 
         Gate::policy(MonitoredApi::class, MonitoredApiPolicy::class);
