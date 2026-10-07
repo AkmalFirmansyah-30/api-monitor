@@ -1,25 +1,35 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\MonitoredApiController;
 use App\Services\ApiMonitoringService;
 use Illuminate\Support\Facades\Route;
 
-Route::apiResource('apis', MonitoredApiController::class);
+// Authentication routes (public)
+Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+Route::get('/auth/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 
-Route::post('apis/{monitoredApi}/check', [MonitoredApiController::class, 'check']);
+// Monitored API routes (protected)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('apis', MonitoredApiController::class);
 
-Route::get(
-    'apis/{monitoredApi}/checks',
-    [MonitoredApiController::class, 'checks']
-);
+    Route::post('apis/{monitoredApi}/check', [MonitoredApiController::class, 'check']);
 
-Route::get('incidents', [IncidentController::class, 'index']);
+    Route::get(
+        'apis/{monitoredApi}/checks',
+        [MonitoredApiController::class, 'checks']
+    );
 
-Route::get(
-    'incidents/{incident}',
-    [IncidentController::class, 'show']
-);
+    // Incidents routes (protected)
+    Route::get('incidents', [IncidentController::class, 'index'])->middleware('auth:sanctum');
+    Route::get(
+        'incidents/{incident}',
+        [IncidentController::class, 'show']
+    )->middleware('auth:sanctum');
+});
 
 Route::get('/test/health', function () {
     return response()->json([

@@ -13,16 +13,13 @@ class IncidentController extends Controller
      */
     public function index(Request $request)
     {
-        $apiId = $request->query('api_id');
-
-        $query = Incident::query()
-            ->with(['monitoredApi' => fn($q) => $q->select('id', 'name')]);
-
-        if ($apiId) {
-            $query->where('monitored_api_id', $apiId);
-        }
-
-        $incidents = $query->latest('started_at')->get();
+        $incidents = Incident::query()
+            ->whereHas('monitoredApi', function ($query) {
+                $query->where('user_id', $request->user()->id);
+            })
+            ->with(['monitoredApi' => fn($q) => $q->select('id', 'name')])
+            ->latest('started_at')
+            ->get();
 
         return IncidentResource::collection($incidents);
     }
@@ -32,6 +29,8 @@ class IncidentController extends Controller
      */
     public function show(Incident $incident)
     {
+        $incident->load(['monitoredApi' => fn($q) => $q->select('id', 'name')]);
+
         return new IncidentResource($incident);
     }
 }

@@ -18,7 +18,7 @@ class MonitoredApiController extends Controller
     public function index(Request $request)
     {
         $apis = MonitoredApi::query()
-            ->where('user_id', $request->user()?->id ?? 1)
+            ->where('user_id', $request->user()->id)
             ->withCount('checks')
             ->latest()
             ->get();
@@ -33,7 +33,7 @@ class MonitoredApiController extends Controller
     {
         $api = MonitoredApi::create([
             ...$request->validated(),
-            'user_id' => $request->user()?->id ?? 1,
+            'user_id' => $request->user()->id,
             'status' => 'UP',
             'uptime' => 100.00,
         ]);
@@ -73,6 +73,8 @@ class MonitoredApiController extends Controller
         UpdateMonitoredApiRequest $request,
         MonitoredApi $monitoredApi
     ) {
+        $this->authorize('update', $monitoredApi);
+
         $monitoredApi->update(
             $request->validated()
         );
@@ -90,6 +92,8 @@ class MonitoredApiController extends Controller
     public function destroy(
         MonitoredApi $monitoredApi
     ) {
+        $this->authorize('delete', $monitoredApi);
+
         $monitoredApi->delete();
 
         return response()->json([
@@ -102,6 +106,8 @@ class MonitoredApiController extends Controller
      */
     public function check(MonitoredApi $monitoredApi)
     {
+        $this->authorize('check', $monitoredApi);
+
         $service = app(ApiMonitoringService::class);
 
         return $service->check($monitoredApi);
@@ -112,6 +118,8 @@ class MonitoredApiController extends Controller
      */
     public function checks(MonitoredApi $monitoredApi)
     {
+        $this->authorize('view checks', $monitoredApi);
+
         $checks = $monitoredApi->checks()
             ->latest('checked_at')
             ->limit(50)

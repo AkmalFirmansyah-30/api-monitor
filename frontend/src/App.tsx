@@ -1,11 +1,16 @@
-import { Navigate, Route, Routes } from "react-router-dom"
-
-import DashboardLayout from "@/layouts/DashboardLayout"
-
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+import { BrowserRouter } from "react-router-dom"
+import { AuthProvider } from "@/context/AuthContext"
+import { ProtectedRoute } from "@/components/common/ProtectedRoute"
+import { LoginPage } from "@/pages/auth/Login"
+import { RegisterPage } from "@/pages/auth/Register"
 import Dashboard from "@/pages/dashboard/Dashboard"
 import Apis from "@/pages/apis/Apis"
 import ApiDetail from "@/pages/apis/ApiDetail"
 import Incidents from "@/pages/incidents/Incidents"
+import { Route, Routes } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
 
 function Placeholder({
   title,
@@ -25,55 +30,78 @@ function Placeholder({
   )
 }
 
-
 function App() {
+  const { isLoading } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-slate-500">Loading...</p>
+      </div>
+    )
+  }
+
   return (
-    <Routes>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
 
-      <Route
-        element={<DashboardLayout />}
-      >
+          {/* Auth routes (public) */}
+          <Route
+            path="/login"
+            element={<LoginPage />}
+          />
 
-        <Route
-          path="/"
-          element={
-            <Navigate
-              to="/dashboard"
-              replace
+          <Route
+            path="/register"
+            element={<RegisterPage />}
+          />
+
+          {/* Protected routes - only for authenticated users */}
+          <Route
+            element={<ProtectedRoute />}
+            path="/dashboard">
+            <Route
+              path="/"
+              element={<Dashboard />}
             />
-          }
-        />
 
-        <Route
-          path="/dashboard"
-          element={<Dashboard />}
-        />
+            <Route
+              path="/apis"
+              element={<Apis />}
+            />
 
-        <Route
-          path="/apis"
-          element={<Apis />}
-        />
+            <Route
+              path="/apis/:id"
+              element={<ApiDetail />}
+            />
 
-        <Route
-          path="/apis/:id"
-          element={<ApiDetail />}
-        />
+            <Route
+              path="/incidents"
+              element={<Incidents />}
+            />
 
-        <Route
-          path="/incidents"
-          element={<Incidents />}
-        />
+            <Route
+              path="/settings"
+              element={<Placeholder title="Settings" />}
+            />
 
-        <Route
-          path="/settings"
-          element={<Placeholder title="Settings" />}
-        />
+          </Route>
 
-      </Route>
-
-    </Routes>
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
 
+export default function Root() {
+  return (
+    <StrictMode>
+      <App />
+    </StrictMode>
+  )
+}
 
-export default App
+createRoot(document.getElementById("root")!).render(
+  <Root />
+)

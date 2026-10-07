@@ -4,7 +4,11 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schedule;
-use App\Console\Commands\CheckMonitoredApis;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+use App\Policies\MonitoredApiPolicy;
+use App\Services\ApiMonitoringService;
+use App\Services\IncidentService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,7 +33,13 @@ class AppServiceProvider extends ServiceProvider
             //
         }
 
+        Auth::provider('users', function ($app, $settings) {
+            //
+        });
+
         Schedule::command('api-monitor:check')
             ->everyMinute();
+
+        Gate::policy(MonitoredApi::class, MonitoredApiPolicy::class);
     }
 }
