@@ -12,44 +12,64 @@ import {
   XCircle,
 } from "lucide-react"
 import { Link, useParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 
-import { getApi, getApiChecks, getIncidents } from "@/services/monitoredApiService"
+import { getApi, getApiChecks, getStats, getResponseTime } from "@/services/monitoredApiService"
 
-import type { ApiCheck, Incident, IncidentStatus, MonitoredApi } from "@/types/api"
+import type { ApiCheck, MonitoredApi } from "@/types/api"
+import type { DashboardRange } from "@/services/dashboardService"
 
 import { ApiStatusBadge } from "@/components/api/ApiStatusBadge"
 
 function ApiDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
 
   const [api, setApi] = useState<MonitoredApi | null>(null)
   const [checks, setChecks] = useState<ApiCheck[]>([])
-  // @ts-ignore
-  const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
+  const [range, setRange] = useState<DashboardRange>("24h")
+  const [responseTimeData, setResponseTimeData] = useState<
+    | { timestamp: string; averageResponseTime: number }[]
+    | null
+  >(null)
+  const [stats, setStats] = useState<{
+    uptime: number | null
+    averageResponseTime: number | null
+    totalChecks: number
+    upChecks: number
+    degradedChecks: number
+    downChecks: number
+  }>({
+    uptime: null,
+    averageResponseTime: null,
+    totalChecks: 0,
+    upChecks: 0,
+    degradedChecks: 0,
+    downChecks: 0,
+  })
+
   useEffect(() => {
     const loadData = async () => {
-      try {
-        setLoading(true)
-        setError("")
+      if (!id) return
 
-        const [apiData, checksData, incidentsData] = await Promise.all([
+      setLoading(true)
+      setError("")
+
+      try {
+        const [apiData, checksData, statsData, responseTime] = await Promise.all([
           getApi(Number(id)),
           getApiChecks(Number(id)),
-          getIncidents(Number(id)),
+          getStats(Number(id)),
+          getResponseTime(Number(id), "24h"),
         ])
-
-        // Convert incident status from service type to app type
-        const convertedIncidents = incidentsData.map((inc) => ({
-          ...inc,
-          status: inc.status as IncidentStatus,
-        }))
 
         setApi(apiData)
         setChecks(checksData)
-        setIncidents(convertedIncidents)
+        setStats(statsData)
+        setResponseTimeData(responseTime?.data ?? [])
       } catch (err) {
         console.error("Failed to load API detail:", err)
         setError("Failed to load API detail. Please try again.")
@@ -157,6 +177,7 @@ function ApiDetail() {
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+              onClick={() => navigate(`/apis/${api.id}/check`)}
             >
               <RefreshCw className="h-4 w-4" />
               Check Now
@@ -177,19 +198,21 @@ function ApiDetail() {
         <StatCard
           label="Response time"
           value={
-            api.responseTime !== null
-              ? `${api.responseTime} ms`
-              : "—"
+            stats.averageResponseTime !== null
+              ? `${stats.averageResponseTime} ms`
+              : api.responseTime !== null
+                ? `${api.responseTime} ms`
+                : "—"
           }
           icon={Timer}
-          description="Latest response"
+          description="Average response time"
         />
 
         <StatCard
           label="Uptime"
-          value={api.uptime}
+          value={stats.uptime !== null ? `${stats.uptime}%` : "—"}
           icon={TrendingUp}
-          description="Current availability"
+          description="Availability (UP + DEGRADED)"
         />
 
         <StatCard
@@ -200,7 +223,7 @@ function ApiDetail() {
         />
       </div>
 
-      {/* Response chart */}
+      {/* Response time chart */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div>
           <h2 className="font-semibold text-slate-900">
@@ -212,44 +235,71 @@ function ApiDetail() {
           </p>
         </div>
 
-        <div className="mt-6 flex h-64 items-end gap-3 border-b border-l border-slate-200 px-4 pb-0">
-          {checks
-            .filter(
-              (check) =>
-                check.responseTime !== null,
-            )
-            .reverse()
-            .map((check) => {
-              const height = Math.min(
-                Math.max(
-                  ((check.responseTime ?? 0) /
-                    900) *
-                    100,
-                  8,
-                ),
-                100,
-              )
+        <div className="mt-6">
+          {responseTimeData && responseTimeData.length > 0 ? (
+            <div className="h-64 flex items-end gap-3 border-b border-l border-slate-200 px-4 pb-0">
+              {responseTimeData.map((point) => {
+                const height = Math.min(
+                  Math.max(
+                    (point.averageResponseTime / 900) * 100,
+                    8,
+                  ),
+                  100,
+                )
 
-              return (
-                <div
-                  key={check.id}
-                  className="group flex h-full flex-1 items-end"
-                >
+                return (
                   <div
-                    className="w-full rounded-t-md bg-emerald-500/80 transition hover:bg-emerald-600"
-                    style={{
-                      height: `${height}%`,
-                    }}
-                    title={`${check.responseTime} ms`}
-                  />
-                </div>
-              )
-            })}
+                    key={point.timestamp}
+                    className="group flex h-full flex-1 items-end"
+                  >
+                    <div
+                      className="w-full rounded-t-md bg-emerald-500/80 transition hover:bg-emerald-600"
+                      style={{
+                        height: `${height}%`,
+                      }}
+                      title={`${point.averageResponseTime} ms`}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="mt-6 text-sm text-slate-500 text-center">
+              No response-time data available for this period.
+            </p>
+          )}
+
+          <div className="mt-3 flex justify-between text-xs text-slate-400">
+            <span>Older</span>
+            <span>Recent</span>
+          </div>
         </div>
 
-        <div className="mt-3 flex justify-between text-xs text-slate-400">
-          <span>Older</span>
-          <span>Recent</span>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            onClick={() => setRange("24h")}
+            style={{ background: range === "24h" ? "slate-100" : "transparent" }}
+          >
+            24h
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            onClick={() => setRange("7d")}
+            style={{ background: range === "7d" ? "slate-100" : "transparent" }}
+          >
+            7d
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            onClick={() => setRange("30d")}
+            style={{ background: range === "30d" ? "slate-100" : "transparent" }}
+          >
+            30d
+          </button>
         </div>
       </div>
 
@@ -274,9 +324,13 @@ function ApiDetail() {
               <div className="flex items-center gap-3">
                 {check.status === "UP" ? (
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-500" />
-                )}
+                ) : check.status === "DEGRADED"
+                  ? (
+                      <TrendingUp className="h-5 w-5 text-amber-500" />
+                    )
+                  : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
 
                 <div>
                   <p className="text-sm font-medium text-slate-900">
@@ -289,22 +343,16 @@ function ApiDetail() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-8 text-sm">
+              <div className="flex items-center gap-2 text-sm">
                 <div>
-                  <p className="text-xs text-slate-400">
-                    HTTP
-                  </p>
-
+                  <p className="text-xs text-slate-400">HTTP</p>
                   <p className="mt-1 font-medium text-slate-700">
                     {check.statusCode ?? "—"}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-slate-400">
-                    Response
-                  </p>
-
+                  <p className="text-xs text-slate-400">Response</p>
                   <p className="mt-1 font-medium text-slate-700">
                     {check.responseTime !== null
                       ? `${check.responseTime} ms`

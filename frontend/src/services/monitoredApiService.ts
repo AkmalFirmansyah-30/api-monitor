@@ -152,6 +152,67 @@ export async function getIncidents(id: number): Promise<Incident[]> {
 }
 
 /**
+ * Get statistics for a monitored API.
+ */
+export async function getStats(
+  id: number,
+): Promise<{
+  uptime: number | null
+  averageResponseTime: number | null
+  totalChecks: number
+  upChecks: number
+  degradedChecks: number
+  downChecks: number
+}> {
+  const response = await api.get(`/apis/${id}/stats`)
+
+  const rawData = response.data.data ?? response.data
+
+  if (!rawData || typeof rawData !== "object") {
+    console.error("GET /apis/{id}/stats rawData is invalid:", rawData)
+    return {
+      uptime: null,
+      averageResponseTime: null,
+      totalChecks: 0,
+      upChecks: 0,
+      degradedChecks: 0,
+      downChecks: 0,
+    }
+  }
+
+  return {
+    uptime: rawData.uptime ?? null,
+    averageResponseTime: rawData.averageResponseTime ?? null,
+    totalChecks: rawData.totalChecks ?? 0,
+    upChecks: rawData.upChecks ?? 0,
+    degradedChecks: rawData.degradedChecks ?? 0,
+    downChecks: rawData.downChecks ?? 0,
+  }
+}
+
+/**
+ * Get response time analytics for a monitored API.
+ */
+export async function getResponseTime(
+  id: number,
+  range: "24h" | "7d" | "30d" = "24h",
+): Promise<{ data: { timestamp: string; averageResponseTime: number }[] }> {
+  const params = new URLSearchParams()
+  params.append("range", range)
+
+  const response = await api.get(`/apis/${id}/response-time?` + params.toString())
+
+  const rawData = response.data.data ?? response.data
+
+  if (!Array.isArray(rawData)) {
+    console.error("GET /apis/{id}/response-time rawData is NOT an array:", rawData)
+    return { data: [] }
+  }
+
+  return { data: rawData }
+}
+
+/**
  * Get a single incident by ID.
  */
 export async function getIncident(id: number): Promise<Incident | null> {

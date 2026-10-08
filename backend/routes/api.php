@@ -30,6 +30,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/uptime', [\App\Http\Controllers\DashboardController::class, 'uptime']);
     Route::get('dashboard/incidents', [\App\Http\Controllers\DashboardController::class, 'incidents']);
 
+// API detail & analytics routes (protected)
+    Route::get('apis/{api}', [\App\Http\Controllers\MonitoredApiController::class, 'show']);
+    Route::get('apis/{api}/checks', [\App\Http\Controllers\MonitoredApiController::class, 'checks']);
+    Route::post('apis/{api}/check', [\App\Http\Controllers\MonitoredApiController::class, 'check']);
+    Route::get('apis/{api}/stats', [\App\Http\Controllers\MonitoredApiController::class, 'stats']);
+    Route::get('apis/{api}/response-time', [\App\Http\Controllers\MonitoredApiController::class, 'responseTime']);
+
     // Incidents routes (protected)
     Route::get('incidents', [IncidentController::class, 'index'])->middleware('auth:sanctum');
     Route::get(

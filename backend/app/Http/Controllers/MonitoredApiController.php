@@ -120,11 +120,129 @@ class MonitoredApiController extends Controller
     {
         $this->authorize('view checks', $monitoredApi);
 
+        $perPage = $monitoredApi->checks()
+            ->paginate(20)->perPage();
+
+        $perPage = min($perPage, 100);
+
         $checks = $monitoredApi->checks()
             ->latest('checked_at')
-            ->limit(50)
-            ->get();
+            ->paginate($perPage);
 
-        return ApiCheckResource::collection($checks);
+        return ApiCheckResource::collection($checks)->additional([
+            'meta' => [
+                'currentPage' => $checks->currentPage(),
+                'lastPage' => $checks->lastPage(),
+                'perPage' => $checks->perPage(),
+                'total' => $checks->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Get statistics for the specified monitored API.
+     */
+    public function stats(MonitoredApi $monitoredApi)
+    {
+        $this->authorize('view', $monitoredApi);
+
+        $totalChecks = $monitoredApi->checks()->count();
+        $upChecks = $monitoredApi->checks()->where('status', 'UP')->count();
+        $degradedChecks = $monitoredApi->checks()->where('status', 'DEGRADED')->count();
+        $downChecks = $monitoredApi->checks()->where('status', 'DOWN')->count();
+
+        $averageResponseTime = $monitoredApi->checks()
+            ->whereNotNull('response_time')
+            ->avg('response_time');
+
+        $uptime = $totalChecks > 0
+            ? round((($upChecks + $degradedChecks) / $totalChecks) * 100, 2)
+            : 0;
+
+        return [
+            'uptime' => $uptime,
+            'averageResponseTime' => $averageResponseTime !== null
+                ? round($averageResponseTime)
+                : null,
+            'totalChecks' => $totalChecks,
+            'upChecks' => $upChecks,
+            'degradedChecks' => $degradedChecks,
+            'downChecks' => $downChecks,
+        ];
+    }
+
+    /**
+     * Get response time analytics for the specified monitored API.
+     */
+    public function responseTime(MonitoredApi $monitoredApi, Request $request)
+    {
+        $this->authorize('view', $monitoredApi);
+
+        $range = $request->string('range') ?? '24h';
+
+        $validRanges = ['24h', '7d', '30d'];
+        if (!in_array($range, $validRanges)) {
+            return response()->json([
+                'error' => 'Invalid range. Valid ranges: 24h, 7d, 30d',
+            ], 422);
+        }
+
+        $now = now();
+        $checks = $monitoredApi->checks()
+            ->latest('checked_at')
+            ->get(['id', 'status', 'response_time', 'checked_at']);
+
+        // Aggregate data based on range
+        $aggregated = $this->aggregateResponseTime($checks, $range, $now);
+
+        return response()->json([
+            'range' => $range,
+            'data' => $aggregated,
+        ]);
+    }
+
+    /**
+     * Aggregate response time by time range.
+     */
+    private function aggregateResponseTime($checks, string $range, $now)
+    {
+        $result = [];
+
+        if ($range === '24h') {
+            $hourly = $checks->groupBy(function ($check) use ($now) {
+                return $now->startOfHour()->subHour()->format('Y-m-d H:i');
+            });
+
+            foreach ($hourly as $timestamp => $hourChecks) {
+                $result[] = [
+                    'timestamp' => $timestamp,
+                    'averageResponseTime' => $hourChecks->avg('response_time') ?? 0,
+                ];
+            }
+        } elseif ($range === '7d') {
+            $daily = $checks->groupBy(function ($check) use ($now) {
+                return $now->startOfDay()->subDay()->format('Y-m-d');
+            });
+
+            foreach ($daily as $timestamp => $dayChecks) {
+                $result[] = [
+                    'date' => $timestamp,
+                    'averageResponseTime' => $dayChecks->avg('response_time') ?? 0,
+                ];
+            }
+        } elseif ($range === '30d') {
+            $daily = $checks->groupBy(function ($check) use ($now) {
+                return $now->startOfDay()->subDay()->format('Y-m-d');
+            });
+
+            foreach ($daily as $timestamp => $dayChecks) {
+                $result[] = [
+                    'date' => $timestamp,
+                    'averageResponseTime' => $dayChecks->avg('response_time') ?? 0,
+                ];
+            }
+        }
+
+        return $result;
     }
 }
