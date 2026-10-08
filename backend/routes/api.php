@@ -23,6 +23,13 @@ Route::middleware('auth:sanctum')->group(function () {
         [MonitoredApiController::class, 'checks']
     );
 
+    // Dashboard routes (protected)
+    Route::get('dashboard/summary', [\App\Http\Controllers\DashboardController::class, 'summary']);
+    Route::get('dashboard/recent-checks', [\App\Http\Controllers\DashboardController::class, 'recentChecks']);
+    Route::get('dashboard/response-time', [\App\Http\Controllers\DashboardController::class, 'responseTime']);
+    Route::get('dashboard/uptime', [\App\Http\Controllers\DashboardController::class, 'uptime']);
+    Route::get('dashboard/incidents', [\App\Http\Controllers\DashboardController::class, 'incidents']);
+
     // Incidents routes (protected)
     Route::get('incidents', [IncidentController::class, 'index'])->middleware('auth:sanctum');
     Route::get(
