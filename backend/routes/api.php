@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\MonitoredApiController;
+use App\Http\Controllers\NotificationController;
 use App\Services\ApiMonitoringService;
 use Illuminate\Support\Facades\Route;
 
@@ -42,6 +43,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get(
         'incidents/{incident}',
         [IncidentController::class, 'show']
+    )->middleware('auth:sanctum');
+
+    // Notification routes (protected)
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::patch(
+        'notifications/{notification}/read',
+        [NotificationController::class, 'markAsRead']
+    )->middleware('auth:sanctum');
+    Route::post(
+        'notifications/read-all',
+        [NotificationController::class, 'markAllAsRead']
     )->middleware('auth:sanctum');
 });
 

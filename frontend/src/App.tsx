@@ -12,6 +12,7 @@ import Incidents from "@/pages/incidents/Incidents"
 import IncidentDetail from "@/pages/incidents/IncidentDetail"
 import { Route, Routes } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
+import Notifications from "@/pages/Notifications"
 
 function Placeholder({
   title,
@@ -80,6 +81,11 @@ function App() {
 <Route
   path="/incidents"
   element={<Incidents />}
+/>
+
+            <Route
+  path="/notifications"
+  element={<Notifications />}
 />
 
             <Route

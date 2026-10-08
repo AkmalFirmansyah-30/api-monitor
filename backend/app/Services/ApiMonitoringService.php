@@ -4,9 +4,12 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 use App\Models\MonitoredApi;
 use App\Models\ApiCheck;
 use App\Services\IncidentService;
+use App\Notifications\IncidentCreatedNotification;
+use App\Notifications\IncidentResolvedNotification;
 
 class ApiMonitoringService
 {
@@ -110,14 +113,30 @@ class ApiMonitoringService
 
         // Incident detection and management
         if ($status === 'DOWN') {
-            $this->incidentService->createIncident(
+            $incident = $this->incidentService->createIncident(
                 $api,
                 "{$api->name} is down",
                 $errorMessage ?? 'Connection failed'
             );
+
+            // Notify API owner of new incident
+            if ($incident) {
+                $user = $api->user;
+                if ($user) {
+                    Notification::send($user, new IncidentCreatedNotification($incident));
+                }
+            }
         } elseif ($status === 'UP') {
             // Resolve any open incident when API returns to UP
-            $this->incidentService->resolveIncident($api);
+            $incident = $this->incidentService->resolveIncident($api);
+
+            // Notify API owner of recovery
+            if ($incident) {
+                $user = $api->user;
+                if ($user) {
+                    Notification::send($user, new IncidentResolvedNotification($incident));
+                }
+            }
         }
 
         return [

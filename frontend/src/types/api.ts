@@ -74,3 +74,37 @@ export type IncidentPagination = {
   perPage: number
   total: number
 }
+
+export type NotificationType =
+  | "incident_created"
+  | "incident_resolved"
+
+export type Notification = {
+  id: number
+  type: NotificationType
+  incidentId: number
+  apiId: number
+  apiName: string
+  title: string
+  message: string
+  readAt: string | null
+  createdAt: string
+}
+
+export type NotificationPagination = {
+  currentPage: number
+  lastPage: number
+  perPage: number
+  total: number
+}
+
+export type NotificationListResponse = {
+  data: Notification[]
+  meta: {
+    currentPage: number
+    lastPage: number
+    perPage: number
+    total: number
+  }
+  unreadCount: number
+}
