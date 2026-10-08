@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard/Dashboard"
 import Apis from "@/pages/apis/Apis"
 import ApiDetail from "@/pages/apis/ApiDetail"
 import Incidents from "@/pages/incidents/Incidents"
+import IncidentDetail from "@/pages/incidents/IncidentDetail"
 import { Route, Routes } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
 
@@ -76,9 +77,14 @@ function App() {
               element={<ApiDetail />}
             />
 
+<Route
+  path="/incidents"
+  element={<Incidents />}
+/>
+
             <Route
-              path="/incidents"
-              element={<Incidents />}
+              path="/incidents/:id"
+              element={<IncidentDetail />}
             />
 
             <Route

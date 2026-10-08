@@ -1,4 +1,3 @@
-import axios from "axios"
 import api from "@/services/api"
 import type { MonitoredApi, ApiCheck, Incident } from "@/types/api"
 
@@ -19,23 +18,12 @@ export type UpdateMonitoredApiPayload =
 export async function getApis(): Promise<MonitoredApi[]> {
   const response = await api.get("/apis")
 
-  console.log("========== GET APIS DEBUG ==========")
-  console.log("Axios response:", response)
-  console.log("Axios response.data:", response.data)
-  console.log("response.data.data:", response.data?.data)
-  console.log("Array.isArray(response.data?.data):", Array.isArray(response.data?.data))
-  console.log("====================================")
-
   const rawData = response.data?.data ?? response.data
 
   if (!Array.isArray(rawData)) {
     console.error("GET /apis rawData is NOT an array:", rawData)
     return []
   }
-
-  console.log("getApis() returning:", rawData)
-  console.log("getApis() length:", rawData.length)
-  console.log("====================================")
 
   return rawData as MonitoredApi[]
 }
@@ -121,33 +109,81 @@ export async function getApiChecks(id: number): Promise<ApiCheck[]> {
 }
 
 /**
- * Get all incidents for a monitored API.
+ * Get incidents with optional filters.
+ *
+ * Supported query parameters:
+ *   - status: "OPEN" or "RESOLVED"
+ *   - apiId: filter by API ID (only own API's incidents)
+ *   - search: search in title and API name
+ *   - page: page number (Laravel pagination)
+ *   - perPage: items per page (max 100)
  */
-export async function getIncidents(id: number): Promise<Incident[]> {
-  try {
-    const response = await api.get(`/incidents?apiId=${id}`)
-    console.log("getIncidents response status:", response.status)
-    console.log("getIncidents response.data:", response.data)
-    console.log("getIncidents response.data.data:", response.data?.data)
+export async function getIncidents(
+  id?: number,
+  params: {
+    status?: "OPEN" | "RESOLVED"
+    apiId?: number
+    search?: string
+    page?: number
+    perPage?: number
+  } = {}
+): Promise<{
+  data: Incident[]
+  meta: {
+    currentPage: number
+    lastPage: number
+    perPage: number
+    total: number
+  }
+}> {
+  const searchParams = new URLSearchParams()
 
-    const rawData = response.data?.data ?? response.data
+  if (params.status) {
+    searchParams.append("status", params.status)
+  }
+  if (params.apiId !== undefined) {
+    searchParams.append("apiId", params.apiId.toString())
+  }
+  if (params.search) {
+    searchParams.append("search", params.search)
+  }
+  if (params.page !== undefined) {
+    searchParams.append("page", params.page.toString())
+  } else {
+    searchParams.append("page", "1")
+  }
+  if (params.perPage !== undefined) {
+    searchParams.append("perPage", Math.min(params.perPage, 100).toString())
+  } else {
+    searchParams.append("perPage", "20")
+  }
 
-    if (!Array.isArray(rawData)) {
-      console.error("GET /api/incidents rawData is NOT an array:", rawData)
-      return []
+  const base = id !== undefined ? `/apis/${id}/incidents` : "/incidents"
+  const response = await api.get(`${base}?${searchParams.toString()}`)
+
+  const rawData = response.data.data ?? response.data
+
+  if (!Array.isArray(rawData)) {
+    console.error("GET /incidents rawData is NOT an array:", rawData)
+    return {
+      data: [],
+      meta: {
+        currentPage: 1,
+        lastPage: 1,
+        perPage: 20,
+        total: 0,
+      },
     }
+  }
 
-    return rawData as Incident[]
-  } catch (error) {
-    console.error("getIncidents axios error:")
-    if (axios.isAxiosError(error)) {
-      console.error("  message:", error.message)
-      console.error("  response status:", error.response?.status)
-      console.error("  response data:", error.response?.data)
-    } else {
-      console.error("  non-axios error:", error)
-    }
-    return []
+  return {
+    data: rawData as Incident[],
+    meta: {
+      currentPage: response.data.meta ?? 1,
+      lastPage: response.data.meta ?? 1,
+      perPage: response.data.perPage ?? 20,
+      total: response.data.total ?? 0,
+    },
   }
 }
 
@@ -197,10 +233,10 @@ export async function getResponseTime(
   id: number,
   range: "24h" | "7d" | "30d" = "24h",
 ): Promise<{ data: { timestamp: string; averageResponseTime: number }[] }> {
-  const params = new URLSearchParams()
-  params.append("range", range)
+  const searchParams = new URLSearchParams()
+  searchParams.append("range", range)
 
-  const response = await api.get(`/apis/${id}/response-time?` + params.toString())
+  const response = await api.get(`/apis/${id}/response-time?` + searchParams.toString())
 
   const rawData = response.data.data ?? response.data
 

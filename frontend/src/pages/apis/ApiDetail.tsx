@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import {
+  AlertCircle,
   ArrowLeft,
   CheckCircle2,
   Clock3,
@@ -15,8 +16,10 @@ import { Link, useParams } from "react-router-dom"
 import { useNavigate } from "react-router-dom"
 
 import { getApi, getApiChecks, getStats, getResponseTime } from "@/services/monitoredApiService"
+import { getIncident } from "@/services/incidentService"
 
 import type { ApiCheck, MonitoredApi } from "@/types/api"
+import type { Incident } from "@/types/api"
 import type { DashboardRange } from "@/services/dashboardService"
 
 import { ApiStatusBadge } from "@/components/api/ApiStatusBadge"
@@ -35,7 +38,7 @@ function ApiDetail() {
     | { timestamp: string; averageResponseTime: number }[]
     | null
   >(null)
-  const [stats, setStats] = useState<{
+const [stats, setStats] = useState<{
     uptime: number | null
     averageResponseTime: number | null
     totalChecks: number
@@ -51,6 +54,8 @@ function ApiDetail() {
     downChecks: 0,
   })
 
+  const [openIncident, setOpenIncident] = useState<Incident | null>(null)
+
   useEffect(() => {
     const loadData = async () => {
       if (!id) return
@@ -59,17 +64,25 @@ function ApiDetail() {
       setError("")
 
       try {
-        const [apiData, checksData, statsData, responseTime] = await Promise.all([
+        const [
+          apiData,
+          checksData,
+          statsData,
+          responseTime,
+          incidentData,
+        ] = await Promise.all([
           getApi(Number(id)),
           getApiChecks(Number(id)),
           getStats(Number(id)),
           getResponseTime(Number(id), "24h"),
+          getIncident(Number(id)),
         ])
 
         setApi(apiData)
         setChecks(checksData)
         setStats(statsData)
         setResponseTimeData(responseTime?.data ?? [])
+        setOpenIncident(incidentData ?? null)
       } catch (err) {
         console.error("Failed to load API detail:", err)
         setError("Failed to load API detail. Please try again.")
@@ -222,6 +235,38 @@ function ApiDetail() {
           description="Most recent check"
         />
       </div>
+
+      {/* Active Incident */}
+      {openIncident && openIncident.status === "OPEN" && (
+        <div className="rounded-xl border border-red-500/20 bg-red-50 p-6 shadow-sm mb-6">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-900">Active Incident</p>
+              <p className="text-sm text-slate-500">API Down</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Started:{" "}
+              </p>
+              <p className="mt-1 text-sm font-medium text-red-600">
+                {new Date().toLocaleTimeString("en-GB", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })} ago</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Link
+              to={`/incidents/${openIncident.id}`}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-200 transition"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              View Incident
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Response time chart */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -405,3 +450,4 @@ function StatCard({
 }
 
 export default ApiDetail
+

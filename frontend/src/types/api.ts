@@ -49,3 +49,28 @@ export type ApiCheck = {
   errorMessage: string | null
   checkedAt: string
 }
+
+export type IncidentListResponse = {
+  data: Incident[]
+  meta: {
+    currentPage: number
+    lastPage: number
+    perPage: number
+    total: number
+  }
+}
+
+export type IncidentFilters = {
+  status?: "OPEN" | "RESOLVED"
+  apiId?: number
+  search?: string
+  page?: number
+  perPage?: number
+}
+
+export type IncidentPagination = {
+  currentPage: number
+  lastPage: number
+  perPage: number
+  total: number
+}
