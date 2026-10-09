@@ -108,3 +108,30 @@ export type NotificationListResponse = {
   }
   unreadCount: number
 }
+
+export type MonitoringRule = {
+  id: number
+  monitoredApiId: number
+  expected_status_codes: number[]
+  body_keyword: string | null
+  json_path: string | null
+  json_expected_value: string | null
+  warning_response_time_ms: number | null
+  failure_response_time_ms: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type MonitoringRulesState = {
+  isLoading: boolean
+  rules: MonitoringRule | null
+  lastError: string | null
+}
+
+export type CheckResult = {
+  status: "UP" | "DEGRADED" | "DOWN"
+  assertionsPassed: boolean
+  failures: string[]
+  statusCode: number | null
+  responseTime: number | null
+}

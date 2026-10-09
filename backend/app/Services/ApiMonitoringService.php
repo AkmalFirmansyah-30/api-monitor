@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Notification;
 use App\Models\MonitoredApi;
 use App\Models\ApiCheck;
 use App\Services\IncidentService;
+use App\Services\MonitoringRuleEvaluator;
 use App\Notifications\IncidentCreatedNotification;
 use App\Notifications\IncidentResolvedNotification;
 
@@ -21,12 +22,20 @@ class ApiMonitoringService
     protected $incidentService;
 
     /**
+     * The monitoring rule evaluator instance.
+     *
+     * @var \App\Services\MonitoringRuleEvaluator
+     */
+    protected $ruleEvaluator;
+
+    /**
      * Create a new ApiMonitoringService instance.
      *
      */
     public function __construct()
     {
         $this->incidentService = app(IncidentService::class);
+        $this->ruleEvaluator = new MonitoringRuleEvaluator();
     }
 
     /**
@@ -43,6 +52,7 @@ class ApiMonitoringService
         $statusCode = null;
         $responseTime = 0;
         $errorMessage = null;
+        $assertionFailures = [];
 
         try {
             // GET request (tanpa body untuk MVP)
@@ -64,30 +74,17 @@ class ApiMonitoringService
             $responseTime = (microtime(true) - $startTime) * 1000;
             $responseTime = round($responseTime);
 
-            // Logika status
-            if ($response->successful()) {
-                if ($responseTime >= 1000) {
-                    $status = 'DEGRADED';
-                } else {
-                    $status = 'UP';
-                }
-            } elseif ($response->serverError() || $response->clientError()) {
-                $status = 'DOWN';
-                $statusCode = $response->status();
-                $errorMessage = "HTTP {$statusCode}";
-                if ($responseTime >= 1000) {
-                    $status = 'DEGRADED';
-                }
-            } else {
-                $status = 'DOWN';
-                $errorMessage = "Request failed: {$response->reason()}";
-            }
+            // Apply monitoring rules evaluation
+            $evaluation = $this->ruleEvaluator->evaluate($api, $response, $responseTime);
+            $status = $evaluation['status'];
+            $assertionFailures = $evaluation['failures'];
         } catch (\Exception $e) {
             $responseTime = (microtime(true) - $startTime) * 1000;
             $responseTime = round($responseTime);
             $statusCode = null;
             $errorMessage = $e->getMessage();
             $status = 'DOWN';
+            $assertionFailures = ['Request failed: ' . $e->getMessage()];
         }
 
         // Pastikan response_time minimal 0
@@ -95,15 +92,21 @@ class ApiMonitoringService
             $responseTime = 0;
         }
 
-        // Simpan record check
-        ApiCheck::create([
+        // Simpan record check dengan assertion failures
+        $checkData = [
             'monitored_api_id' => $api->id,
             'status' => $status,
             'status_code' => $statusCode,
             'response_time' => $responseTime,
-            'error_message' => $errorMessage,
             'checked_at' => now(),
-        ]);
+        ];
+
+        // Store assertion failures safely (without sensitive data)
+        if (!empty($assertionFailures)) {
+            $checkData['error_message'] = implode('; ', $assertionFailures);
+        }
+
+        ApiCheck::create($checkData);
 
         // Update monitored API
         $api->status = $status;
@@ -112,11 +115,12 @@ class ApiMonitoringService
         $api->save();
 
         // Incident detection and management
+        // Use the evaluated status for incident lifecycle
         if ($status === 'DOWN') {
             $incident = $this->incidentService->createIncident(
                 $api,
                 "{$api->name} is down",
-                $errorMessage ?? 'Connection failed'
+                $assertionFailures ? implode('; ', $assertionFailures) : 'Connection failed'
             );
 
             // Notify API owner of new incident
@@ -137,6 +141,18 @@ class ApiMonitoringService
                     Notification::send($user, new IncidentResolvedNotification($incident));
                 }
             }
+        } elseif ($status === 'DEGRADED') {
+            // Handle DEGRADED status - follow existing policy
+            // Check if there's an open incident that should be resolved
+            $openIncident = $this->incidentService->findOpenIncident($api);
+            if ($openIncident) {
+                $this->incidentService->resolveIncident($api);
+                // Trigger resolution notification
+                $user = $api->user;
+                if ($user) {
+                    Notification::send($user, new IncidentResolvedNotification($openIncident));
+                }
+            }
         }
 
         return [
@@ -145,7 +161,7 @@ class ApiMonitoringService
             'statusCode' => $statusCode,
             'responseTime' => $responseTime,
             'checkedAt' => now(),
-            'errorMessage' => $errorMessage,
+            'errorMessage' => $assertionFailures ? implode('; ', $assertionFailures) : null,
         ];
     }
 }

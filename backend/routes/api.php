@@ -3,7 +3,8 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\MonitoredApiController;
-use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\MonitoringRuleController;
+use App\Http\Requests\MonitoringRulesRequest;
 use App\Services\ApiMonitoringService;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,16 @@ Route::middleware('auth:sanctum')->group(function () {
         'apis/{monitoredApi}/checks',
         [MonitoredApiController::class, 'checks']
     );
+
+    // Monitoring rules routes
+    Route::get(
+        'apis/{api}/monitoring-rules',
+        [MonitoringRuleController::class, 'index']
+    );
+    Route::put(
+        'apis/{api}/monitoring-rules',
+        [MonitoringRuleController::class, 'update']
+    )->middleware('auth:sanctum');
 
     // Dashboard routes (protected)
     Route::get('dashboard/summary', [\App\Http\Controllers\DashboardController::class, 'summary']);

@@ -49,6 +49,11 @@ class MonitoredApi extends Model
         return $this->hasMany(Incident::class);
     }
 
+    public function monitoringRule(): BelongsTo
+    {
+        return $this->belongsTo(MonitoringRule::class);
+    }
+
     /**
      * Scope a query to only include APIs that are due for checking.
      *

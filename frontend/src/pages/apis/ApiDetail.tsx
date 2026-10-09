@@ -15,11 +15,18 @@ import {
 import { Link, useParams } from "react-router-dom"
 import { useNavigate } from "react-router-dom"
 
+import api from "@/services/api"
+import type {
+  MonitoringRule,
+  MonitoringRulesState,
+  CheckResult,
+  MonitoredApi,
+  ApiCheck,
+  Incident,
+} from "@/types/api"
+import { monitoringRulesService } from "@/services/monitoringRulesService"
 import { getApi, getApiChecks, getStats, getResponseTime } from "@/services/monitoredApiService"
 import { getIncident } from "@/services/incidentService"
-
-import type { ApiCheck, MonitoredApi } from "@/types/api"
-import type { Incident } from "@/types/api"
 import type { DashboardRange } from "@/services/dashboardService"
 
 import { ApiStatusBadge } from "@/components/api/ApiStatusBadge"
@@ -52,6 +59,24 @@ const [stats, setStats] = useState<{
     upChecks: 0,
     degradedChecks: 0,
     downChecks: 0,
+  })
+
+  const [rules, setRules] = useState<MonitoringRule | null>(null)
+
+  const [rulesForm] = useState<{
+    expected_status_codes: number[]
+    body_keyword: string | null
+    json_path: string | null
+    json_expected_value: string | null
+    warning_response_time_ms: number | null
+    failure_response_time_ms: number | null
+  }>({
+    expected_status_codes: [],
+    body_keyword: null,
+    json_path: null,
+    json_expected_value: null,
+    warning_response_time_ms: null,
+    failure_response_time_ms: null,
   })
 
   const [openIncident, setOpenIncident] = useState<Incident | null>(null)
@@ -236,37 +261,44 @@ const [stats, setStats] = useState<{
         />
       </div>
 
-      {/* Active Incident */}
-      {openIncident && openIncident.status === "OPEN" && (
-        <div className="rounded-xl border border-red-500/20 bg-red-50 p-6 shadow-sm mb-6">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <AlertCircle className="h-5 w-5 text-red-500" />
+{/* Active Incident */}
+
+{/* Monitoring Rules */}
+      {rules ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+          <h3 className="font-semibold text-slate-900 mb-4">Monitoring Rules</h3>
+          <p className="text-sm text-slate-500 mb-4">
+            Rules determine how the API response is evaluated. Configure assertions
+            to customize status classification beyond the default behavior.
+          </p>
+          <dl className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="font-medium text-slate-700">Expected status codes</dt>
+              <dd>{rules.expected_status_codes?.length ? rules.expected_status_codes.join(', ') : 'None'}</dd>
             </div>
-            <div className="flex-1">
-              <p className="font-semibold text-slate-900">Active Incident</p>
-              <p className="text-sm text-slate-500">API Down</p>
-              <p className="mt-1 text-xs text-slate-500">
-                Started:{" "}
-              </p>
-              <p className="mt-1 text-sm font-medium text-red-600">
-                {new Date().toLocaleTimeString("en-GB", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })} ago</p>
+            <div>
+              <dt className="font-medium text-slate-700">Body keyword</dt>
+              <dd>{rules.body_keyword ? rules.body_keyword : 'None'}</dd>
             </div>
-          </div>
-          <div className="mt-4">
-            <Link
-              to={`/incidents/${openIncident.id}`}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-200 transition"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              View Incident
-            </Link>
-          </div>
+            <div>
+              <dt className="font-medium text-slate-700">JSON path</dt>
+              <dd>{rules.json_path || 'None'}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-700">JSON expected value</dt>
+              <dd>{rules.json_expected_value || 'None'}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-700">Warning threshold (ms)</dt>
+              <dd>{rules.warning_response_time_ms !== null ? rules.warning_response_time_ms : 'None'}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-700">Failure threshold (ms)</dt>
+              <dd>{rules.failure_response_time_ms !== null ? rules.failure_response_time_ms : 'None'}</dd>
+            </div>
+          </dl>
         </div>
-      )}
+      ) : null}
 
       {/* Response time chart */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
