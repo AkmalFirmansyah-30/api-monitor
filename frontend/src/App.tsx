@@ -13,6 +13,7 @@ import IncidentDetail from "@/pages/incidents/IncidentDetail"
 import { Route, Routes } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
 import Notifications from "@/pages/Notifications"
+import { PublicStatusPage } from "@/pages/status/PublicStatusPage"
 
 function Placeholder({
   title,
@@ -59,6 +60,12 @@ function App() {
             element={<RegisterPage />}
           />
 
+          {/* Public status page route - no authentication required */}
+          <Route
+            path="/status/:slug"
+            element={<PublicStatusPage />}
+          />
+
           {/* Protected routes - only for authenticated users */}
           <Route
             element={<ProtectedRoute />}
@@ -78,15 +85,15 @@ function App() {
               element={<ApiDetail />}
             />
 
-<Route
-  path="/incidents"
-  element={<Incidents />}
-/>
+            <Route
+              path="/incidents"
+              element={<Incidents />}
+            />
 
             <Route
-  path="/notifications"
-  element={<Notifications />}
-/>
+              path="/notifications"
+              element={<Notifications />}
+            />
 
             <Route
               path="/incidents/:id"

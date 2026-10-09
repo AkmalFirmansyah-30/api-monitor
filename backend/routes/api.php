@@ -13,8 +13,9 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/auth/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 
-// Monitored API routes (protected)
+// Status Page routes (protected)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('status-pages', StatusPageController::class);
     Route::apiResource('apis', MonitoredApiController::class);
 
     Route::post('apis/{monitoredApi}/check', [MonitoredApiController::class, 'check']);
@@ -56,6 +57,12 @@ Route::middleware('auth:sanctum')->group(function () {
         [NotificationController::class, 'markAllAsRead']
     )->middleware('auth:sanctum');
 });
+
+// Public status page endpoint (no authentication required)
+Route::get(
+    'public/status-pages/{slug}',
+    [\App\Http\Controllers\StatusPageController::class, 'publicShow']
+);
 
 Route::get('/test/health', function () {
     return response()->json([
